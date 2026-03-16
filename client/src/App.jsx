@@ -26,10 +26,6 @@ function App() {
   const [postNote, setPostNote] = useState('');
   const [loadingPreview, setLoadingPreview] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = async () => {
     try {
       const [accs, lgs] = await Promise.all([fetchAccounts(), fetchStoryLogs()]);
@@ -44,6 +40,12 @@ function App() {
       console.error(e);
     }
   };
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogin = async () => {
     try {
