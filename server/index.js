@@ -1,19 +1,33 @@
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { startDailyCheck } = require('./scheduler');
-const { login, getPostMetadata, getHighlightMetadata } = require('./instagram');
-const { getTrackedItems, addTrackedItem, removeTrackedItem } = require('./db');
+const { login, getPostMetadata, getHighlightMetadata, checkProfileAccess } = require('./instagram');
+const { getAccounts, addAccount, updateAccount, removeAccount, getStoryLogs, deleteStoryLog } = require('./db');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Setup Multer for face photo uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, 'uploads/'))
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname)
+  }
+});
+const upload = multer({ storage: storage });
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public')); // Serve downloaded thumbnails
+app.use(express.static(path.join(__dirname, 'public'))); // Serve downloaded thumbnails
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve reference faces
 
-// API Endpoints
-
+// 1. Proxy Image (avoid CORS for external ig images)
 app.get('/api/proxy-image', (req, res) => {
   const imageUrl = req.query.url;
   if (!imageUrl) return res.status(400).json({ error: 'Missing url parameter' });
@@ -32,39 +46,114 @@ app.get('/api/proxy-image', (req, res) => {
   });
 });
 
-// 1. Get all tracked items
-app.get('/api/tracked-items', async (req, res) => {
-  const items = await getTrackedItems();
-  res.json(items);
-});
+// --- Accounts API ---
 
-// 2. Add a new item to track
-app.post('/api/track', async (req, res) => {
-  const { url, type, targetMediaId, thumbnailUrl, note } = req.body;
+// Get all accounts
+app.get('/api/accounts', async (req, res) => {
   try {
-    const newItem = await addTrackedItem({ url, type, targetMediaId, thumbnailUrl, note });
-    res.json(newItem);
+    const accounts = await getAccounts();
+    res.json(accounts);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 2.5 Delete a tracked item
-app.delete('/api/track/:id', async (req, res) => {
+// Add a new account
+app.post('/api/accounts', async (req, res) => {
   try {
-    await removeTrackedItem(req.params.id);
+    const { username, note } = req.body;
+
+    // Profile Accessibility Check
+    const access = await checkProfileAccess(username);
+    if (!access.accessible) {
+      return res.status(403).json({ error: access.reason });
+    }
+
+    const newAccount = await addAccount({ username, note });
+    res.json(newAccount);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update an entire account (trackedPosts, storyConfig without image)
+app.put('/api/accounts/:id', async (req, res) => {
+  try {
+    const updated = await updateAccount(req.params.id, req.body);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete an account
+app.delete('/api/accounts/:id', async (req, res) => {
+  try {
+    await removeAccount(req.params.id);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 3. Fetch metadata (preview) for a URL
-// Returns list of media items in a carousel or stories in a highlight
+// Upload a reference face for story config
+app.post('/api/accounts/:id/face', upload.single('faceImage'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    // Read current account
+    const accounts = await getAccounts();
+    const account = accounts.find(a => a.id === req.params.id);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    // Clean up old file if exists
+    if (account.storyConfig && account.storyConfig.referenceFaceUrl) {
+      const oldPath = path.join(__dirname, 'uploads', account.storyConfig.referenceFaceUrl);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // Update with new path
+    const updatedConfig = {
+      ...account.storyConfig,
+      referenceFaceUrl: req.file.filename // Store filename 
+    };
+
+    const updated = await updateAccount(req.params.id, { storyConfig: updatedConfig });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Story Logs API ---
+
+app.get('/api/story-logs', async (req, res) => {
+  try {
+    const logs = await getStoryLogs();
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/story-logs/:id', async (req, res) => {
+  try {
+    await deleteStoryLog(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+// --- Verification & IG Scraper API ---
+
+// Preview metadata
 app.post('/api/preview', async (req, res) => {
   const { url } = req.body;
   try {
-    // Determine type based on URL
     let data;
     if (url.includes('/p/') || url.includes('/reel/')) {
       data = await getPostMetadata(url);
@@ -80,20 +169,17 @@ app.post('/api/preview', async (req, res) => {
   }
 });
 
-// 4. Trigger manual login (if needed)
 app.post('/api/login', async (req, res) => {
   try {
-    await login({ headless: false }); // Open visible browser
+    await login({ headless: false });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 5. Trigger manual scan
 app.post('/api/scan', async (req, res) => {
   try {
-    // Start scan asynchronously so we don't block the request if there are many items
     const { runManualCheck } = require('./scheduler');
     runManualCheck().catch(e => console.error("Manual check error:", e));
     res.json({ success: true, message: "Scan started in background" });
@@ -104,6 +190,5 @@ app.post('/api/scan', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  // Start the cron job
   startDailyCheck();
 });

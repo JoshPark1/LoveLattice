@@ -34,6 +34,13 @@ server/storageState.json
 server/public/thumbnails/*
 !server/public/thumbnails/.gitkeep
 
+# Reference face photos uploaded by user (personal data)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Temp story downloads (should be cleaned up at runtime, but just in case)
+server/_temp_story_*.jpg
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
