@@ -46,6 +46,14 @@ export default function AccountCard({ account, onClick, onDelete }) {
                 {account.trackedPosts?.length || 0}
               </span>{' '}
               <span className="text-text-tertiary">Posts</span>
+              {account.trackedPosts?.some(p => p.status === 'missing') && (
+                <span 
+                  className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full bg-accent text-white text-[10px] font-bold shadow-[0_0_8px_rgba(230,57,70,0.6)]" 
+                  title="Tracked post is missing!"
+                >
+                  !
+                </span>
+              )}
             </div>
           </div>
           <span

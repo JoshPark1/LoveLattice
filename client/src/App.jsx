@@ -156,6 +156,19 @@ function App() {
     }
   };
 
+  const handleEditPostNote = async (postId, newNote) => {
+    if (!selectedAccount) return;
+    try {
+      const updatedPosts = selectedAccount.trackedPosts.map(p => 
+        p.id === postId ? { ...p, note: newNote } : p
+      );
+      await updateAccount(selectedAccount.id, { trackedPosts: updatedPosts });
+      loadData();
+    } catch (e) {
+      alert("Failed to update post note: " + e.message);
+    }
+  };
+
   const handleRemovePost = (postId) => {
     if (!selectedAccount) return;
     setConfirmModal({
@@ -177,6 +190,14 @@ function App() {
   const handleToggleStoryTracking = async (enabled) => {
     if (!selectedAccount) return;
     const storyConfig = { ...selectedAccount.storyConfig, enabled };
+    if (!enabled) storyConfig.notify = false; // Disable notifications if tracking is turned off
+    await updateAccount(selectedAccount.id, { storyConfig });
+    loadData();
+  };
+
+  const handleToggleStoryNotify = async (notify) => {
+    if (!selectedAccount) return;
+    const storyConfig = { ...selectedAccount.storyConfig, notify };
     await updateAccount(selectedAccount.id, { storyConfig });
     loadData();
   };
@@ -249,8 +270,10 @@ function App() {
             logs={logs}
             onBack={() => setSelectedAccount(null)}
             onRemovePost={handleRemovePost}
+            onEditPostNote={handleEditPostNote}
             onOpenAddPost={() => setIsAddPostModalOpen(true)}
             onToggleStoryTracking={handleToggleStoryTracking}
+            onToggleStoryNotify={handleToggleStoryNotify}
             onUpdateStoryTags={handleUpdateStoryTags}
             onUploadFace={handleUploadFace}
             onRemoveFace={handleRemoveFace}

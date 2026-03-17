@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import EkgTimeline from './EkgTimeline';
 
 export default function AccountDetail({
@@ -5,8 +6,10 @@ export default function AccountDetail({
   logs,
   onBack,
   onRemovePost,
+  onEditPostNote,
   onOpenAddPost,
   onToggleStoryTracking,
+  onToggleStoryNotify,
   onUpdateStoryTags,
   onUploadFace,
   onRemoveFace,
@@ -16,6 +19,24 @@ export default function AccountDetail({
   apiBase,
 }) {
   const accountLogs = logs.filter((l) => l.accountId === account.id || l.username === account.username);
+  
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editNoteText, setEditNoteText] = useState('');
+
+  const handleStartEdit = (post) => {
+    setEditingNoteId(post.id);
+    setEditNoteText(post.note || '');
+  };
+
+  const handleSaveEdit = (postId) => {
+    onEditPostNote(postId, editNoteText);
+    setEditingNoteId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNoteId(null);
+    setEditNoteText('');
+  };
 
   return (
     <div>
@@ -68,21 +89,35 @@ export default function AccountDetail({
                   : post.thumbnailUrl;
 
                 return (
-                  <div key={post.id} className="glass-card group relative overflow-hidden bg-bg-primary/40">
-                    {/* Delete */}
-                    <button
-                      onClick={() => onRemovePost(post.id)}
-                      className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center
-                        rounded-lg bg-accent/20 text-accent text-sm
-                        opacity-0 group-hover:opacity-100 transition-all
-                        hover:bg-accent hover:text-white"
-                    >
-                      ✕
-                    </button>
+                  <div 
+                    key={post.id} 
+                    className={`glass-card group relative overflow-hidden transition-all ${
+                      post.status === 'missing' 
+                        ? 'bg-accent/10 border-accent/30 shadow-[0_0_15px_rgba(230,57,70,0.15)]' 
+                        : 'bg-bg-primary/40'
+                    }`}
+                  >
+                    {/* Actions: Edit & Delete */}
+                    <div className="absolute top-2 right-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <button
+                        onClick={() => handleStartEdit(post)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-bg-secondary text-text-secondary text-xs hover:bg-bg-tertiary hover:text-white"
+                        title="Edit Note"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={() => onRemovePost(post.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-accent/20 text-accent text-sm hover:bg-accent hover:text-white"
+                        title="Remove Post"
+                      >
+                        ✕
+                      </button>
+                    </div>
 
                     {/* Thumbnail */}
                     <a href={post.url} target="_blank" rel="noreferrer">
-                      <div className="h-44 overflow-hidden">
+                      <div className="h-44 overflow-hidden bg-bg-tertiary">
                         <img
                           src={thumbSrc}
                           alt="Thumbnail"
@@ -92,9 +127,30 @@ export default function AccountDetail({
                     </a>
 
                     <div className="p-4">
-                      <h4 className="font-semibold text-sm mb-2 truncate">
-                        {post.note || 'Untitled'}
-                      </h4>
+                      {editingNoteId === post.id ? (
+                        <div className="mb-2">
+                          <input
+                            type="text"
+                            value={editNoteText}
+                            onChange={(e) => setEditNoteText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit(post.id);
+                              if (e.key === 'Escape') handleCancelEdit();
+                            }}
+                            autoFocus
+                            className="w-full bg-bg-secondary border border-border rounded px-2 py-1 text-sm font-semibold text-text-primary focus:outline-none focus:border-accent"
+                          />
+                          <div className="flex gap-2 justify-end mt-1">
+                            <button onClick={handleCancelEdit} className="text-[10px] uppercase font-bold text-text-tertiary hover:text-white">Cancel</button>
+                            <button onClick={() => handleSaveEdit(post.id)} className="text-[10px] uppercase font-bold text-accent hover:text-white">Save</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <h4 className="font-semibold text-sm mb-2 truncate" title={post.note || 'Untitled'}>
+                          {post.note || 'Untitled'}
+                        </h4>
+                      )}
+                      
                       <span
                         className={
                           post.status === 'missing' ? 'badge-alert' : 'badge-active'
@@ -122,20 +178,39 @@ export default function AccountDetail({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Controls */}
             <div className="space-y-6">
-              {/* Toggle */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={account.storyConfig?.enabled || false}
-                    onChange={(e) => onToggleStoryTracking(e.target.checked)}
-                  />
-                  <div className="w-10 h-5 bg-bg-secondary border border-border rounded-full peer-checked:bg-accent transition-colors" />
-                  <div className="absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
-                </div>
-                <span className="text-sm font-medium">Enable Daily Tracking</span>
-              </label>
+              {/* Toggles */}
+              <div className="flex flex-col gap-4">
+                {/* Story Tracking Toggle */}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={account.storyConfig?.enabled || false}
+                      onChange={(e) => onToggleStoryTracking(e.target.checked)}
+                    />
+                    <div className="w-10 h-5 bg-bg-secondary border border-border rounded-full peer-checked:bg-accent transition-colors" />
+                    <div className="absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
+                  </div>
+                  <span className="text-sm font-medium">Enable Daily Tracking</span>
+                </label>
+
+                {/* Text Notifications Toggle */}
+                <label className={`flex items-center gap-3 ${account.storyConfig?.enabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+                  <div className="relative shrink-0">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={account.storyConfig?.notify || false}
+                      onChange={(e) => onToggleStoryNotify(e.target.checked)}
+                      disabled={!account.storyConfig?.enabled}
+                    />
+                    <div className="w-10 h-5 bg-bg-secondary border border-border rounded-full peer-checked:bg-accent transition-colors peer-disabled:bg-bg-tertiary peer-disabled:border-bg-tertiary" />
+                    <div className="absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5 peer-disabled:bg-text-tertiary" />
+                  </div>
+                  <span className="text-sm font-medium text-text-secondary">Text Notifications via SMS</span>
+                </label>
+              </div>
 
               {/* Tags */}
               <div>
