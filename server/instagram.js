@@ -808,11 +808,11 @@ async function checkProfileAccess(username) {
             return { accessible: false, reason: "Login required" };
         }
 
-        // Check for "This account is private" text
+        // Check for "This profile is private" text
         const isPrivate = await page.evaluate(() => {
             // Instagram uses various tags for this text depending on the react build
             const h2s = Array.from(document.querySelectorAll('h2, span, div'));
-            return h2s.some(el => el.textContent && el.textContent.includes('This account is private'));
+            return h2s.some(el => el.textContent && (el.textContent.toLowerCase().includes('this account is private') || el.textContent.toLowerCase().includes('this profile is private')));
         });
 
         if (isPrivate) {
@@ -821,8 +821,8 @@ async function checkProfileAccess(username) {
 
         // Check if account doesn't exist
         const notFound = await page.evaluate(() => {
-            const els = Array.from(document.querySelectorAll('span, h2'));
-            return els.some(el => el.textContent && el.textContent.includes("Sorry, this page isn't available"));
+            const els = Array.from(document.querySelectorAll('span, h2, div'));
+            return els.some(el => el.textContent && (el.textContent.toLowerCase().includes("sorry, this page isn't available") || el.textContent.toLowerCase().includes("profile isn't available")));
         });
 
         if (notFound) {
