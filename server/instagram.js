@@ -462,4 +462,422 @@ async function getHighlightMetadata(url) {
     return items;
 }
 
-module.exports = { login, getPostMetadata, getHighlightMetadata };
+/**
+ * Extracts tagged/mentioned usernames from a story item's metadata.
+ * Covers:
+ *  1. story_bloks_stickers — Instagram's current sticker format, covers both
+ *     @mention stickers (bloks_sticker_type: "mention") and
+ *     reshares (display_type: "mention_reshare")
+ *     Username is at: bloks_sticker.sticker_data.ig_mention.username
+ *  2. Legacy fields: reel_mentions, story_feed_media, usertags
+ */
+function extractTagsFromItem(item) {
+    const tags = new Set();
+
+    try {
+        // 1. story_bloks_stickers — the current Instagram API format
+        //    Covers @mention stickers AND "mention_reshare" (reposts)
+        const bloksStickers = item.story_bloks_stickers || [];
+        for (const sticker of bloksStickers) {
+            const username = sticker?.bloks_sticker?.sticker_data?.ig_mention?.username;
+            if (username) tags.add(username);
+        }
+
+        // 2. Legacy: reel_mentions / story_mentions
+        const mentions = item.reel_mentions || item.story_mentions || [];
+        for (const m of mentions) {
+            if (m.user && m.user.username) tags.add(m.user.username);
+        }
+
+        // 3. Legacy: story_feed_media reshares
+        const reshare = item.story_feed_media || [];
+        for (const r of reshare) {
+            if (r.feed_media?.user?.username) tags.add(r.feed_media.user.username);
+        }
+
+        // 4. User tags in the media
+        const usertags = item.usertags?.in || [];
+        for (const ut of usertags) {
+            if (ut.user?.username) tags.add(ut.user.username);
+        }
+    } catch (e) {
+        // Don't crash story scanning if tag extraction fails
+    }
+
+    return Array.from(tags);
+}
+
+async function getUserStories(username) {
+    console.log(`Fetching active stories for: ${username}`);
+    const { browser, context } = await getBrowserContext();
+    const page = await context.newPage();
+    let storyItems = [];
+
+    try {
+        console.log(`Navigating to profile to fetch stories for ${username}`);
+
+        await page.goto(`https://www.instagram.com/${username}/`);
+        await page.waitForLoadState('domcontentloaded');
+        await sleep(2000, 4000);
+
+        if (page.url().includes('login')) {
+            console.log("Redirected to login. Stories require login.");
+            await browser.close();
+            return [];
+        }
+
+        let userId = null;
+        try {
+            // Use web_profile_info API — reliably returns the VIEWED profile's ID, not the logged-in user's
+            userId = await page.evaluate(async (uname) => {
+                try {
+                    let csrf = '';
+                    const match = document.cookie.match(/csrftoken=([^;]+)/);
+                    if (match) csrf = match[1];
+                    const res = await fetch(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${uname}`, {
+                        headers: {
+                            'X-CSRFToken': csrf,
+                            'X-IG-App-ID': '936619743392459',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Referer': `https://www.instagram.com/${uname}/`
+                        }
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        return json?.data?.user?.id || null;
+                    }
+                } catch (e) {}
+
+                // Fallback: look for profile_id in scripts (not user_id — that's the logged in user)
+                const scripts = Array.from(document.querySelectorAll('script'));
+                for (let s of scripts) {
+                    const text = s.textContent || '';
+                    if (text.includes('"profile_id":"')) {
+                        const m = text.match(/"profile_id":"(\d+)"/);
+                        if (m) return m[1];
+                    }
+                }
+                return null;
+            }, username);
+        } catch (e) {
+            console.log("Error finding user id:", e);
+        }
+
+        if (!userId) {
+            console.log("Could not find Target User ID.");
+            await browser.close();
+            return [];
+        }
+
+        console.log("Extracted User ID:", userId);
+
+        console.log("Setting up network intercept for story metadata...");
+
+
+        console.log("Attempting to click profile picture...");
+        try {
+            await page.evaluate(() => {
+                const header = document.querySelector('header');
+                if (header) {
+                    const btn = header.querySelector('canvas') || header.querySelector('div[role="button"][tabindex="0"]');
+                    if (btn) btn.click();
+                }
+            });
+            await sleep(3000, 5000);
+
+            // Check if we actually navigated to the stories URL
+            if (page.url().includes('/stories/')) {
+                console.log("Navigated to native story viewer via profile picture click.");
+
+                // Intercept View Story confirm popup if it appears
+                try {
+                    const viewStoryBtns = await page.$$('div[role="button"]');
+                    for (const btn of viewStoryBtns) {
+                        const text = await btn.textContent();
+                        if (text && text.trim().toLowerCase() === 'view story') {
+                            console.log("Found 'View story' confirmation popup. Clicking...");
+                            await btn.click();
+                            await sleep(3000, 4000);
+                            break;
+                        }
+                    }
+                } catch (e) { }
+
+                // Walk through stories using DOM to collect CDN image URLs
+                let hasNext = true;
+                let loopCount = 0;
+                while (hasNext && loopCount < 10) {
+                    loopCount++;
+                    const mediaSrc = await page.evaluate(() => {
+                        const video = document.querySelector('video');
+                        if (video && video.src && !video.src.startsWith('blob:')) return { type: 'video', url: video.src };
+
+                        const dict = Array.from(document.querySelectorAll('img[draggable="false"]'));
+                        if (dict.length > 0) {
+                            const largeImgs = dict.filter(img => {
+                                const rect = img.getBoundingClientRect();
+                                return rect.width > 200 || rect.height > 200;
+                            });
+                            if (largeImgs.length > 0) return { type: 'image', url: largeImgs[0].src };
+                        }
+                        return null;
+                    });
+
+                    if (mediaSrc && mediaSrc.url) {
+                        if (!storyItems.find(i => i.url === mediaSrc.url)) {
+                            console.log(`Found story media from DOM via click-through: ${mediaSrc.type}`);
+                            storyItems.push({
+                                id: Date.now().toString() + loopCount,
+                                url: mediaSrc.url,
+                                type: mediaSrc.type,
+                                timestamp: new Date().toISOString(),
+                                thumbnail: mediaSrc.url,
+                                tags: [] // Tags filled in by the context.request API call below
+                            });
+                        }
+                    }
+
+
+
+                    hasNext = await page.evaluate(() => {
+                        const rightBtn = document.querySelector('button[aria-label="Next"]');
+                        if (rightBtn) { rightBtn.click(); return true; }
+                        return false;
+                    });
+
+                    if (hasNext) await sleep(1500, 2000);
+                }
+
+                if (storyItems.length > 0) {
+                    // Download images while session is still active (CDN URLs are session-scoped)
+                    for (const item of storyItems) {
+                        if (item.type === 'image') {
+                            try {
+                                const tempPath = path.join(__dirname, `_temp_story_${Date.now()}.jpg`);
+                                const response = await context.request.get(item.url, {
+                                    headers: { 'Referer': 'https://www.instagram.com/' },
+                                    timeout: 15000
+                                });
+                                if (response.ok()) {
+                                    const buffer = await response.body();
+                                    fs.writeFileSync(tempPath, buffer);
+                                    item.localPath = tempPath;
+                                    console.log(`[DOWNLOAD] Story image saved to ${tempPath}`);
+                                } else {
+                                    console.log(`[DOWNLOAD] CDN responded ${response.status()} — skipping local save.`);
+                                }
+                            } catch (e) {
+                                console.log(`[DOWNLOAD] Failed to save story image: ${e.message}`);
+                            }
+                        }
+                    }
+
+                    // Fetch story metadata via context.request (server-side, bypasses CORS)
+                    // Must run BEFORE browser.close() since it needs the active session cookies.
+                    console.log("[STORIES] Fetching story metadata via context.request...");
+                    try {
+                        const cookies = await context.cookies();
+                        const csrf = cookies.find(c => c.name === 'csrftoken')?.value || '';
+                        const apiRes = await context.request.get(
+                            `https://i.instagram.com/api/v1/feed/reels_media/?reel_ids=${userId}&source=profile`,
+                            {
+                                headers: {
+                                    'X-CSRFToken': csrf,
+                                    'X-IG-App-ID': '936619743392459',
+                                    'Referer': `https://www.instagram.com/${username}/`,
+                                    'Origin': 'https://www.instagram.com'
+                                }
+                            }
+                        );
+                        if (apiRes.ok()) {
+                            const apiJson = await apiRes.json();
+                            const items = apiJson.reels?.[userId]?.items || [];
+                            console.log(`[STORIES] context.request returned ${items.length} metadata item(s).`);
+
+                            // Build the authoritative story list from API metadata.
+                            // The DOM click-through order may differ from or have fewer items
+                            // than the API — assigning tags by index is unreliable when counts
+                            // don't match (e.g. DOM captures story 3 but API item[0] is story 1).
+                            const domItems = storyItems; // save DOM-captured items aside
+                            storyItems = items.map((item, idx) => {
+                                const isVideo = item.media_type === 2 || !!item.video_versions;
+                                const tags = extractTagsFromItem(item);
+                                if (tags.length > 0) console.log(`[STORIES] Tags for story #${idx + 1}:`, tags);
+                                return {
+                                    id: String(item.pk || item.id),
+                                    url: isVideo ? (item.video_versions?.[0]?.url) : (item.image_versions2?.candidates?.[0]?.url),
+                                    type: isVideo ? 'video' : 'image',
+                                    timestamp: item.taken_at ? new Date(item.taken_at * 1000).toISOString() : new Date().toISOString(),
+                                    thumbnail: item.image_versions2?.candidates?.[0]?.url,
+                                    tags
+                                };
+                            });
+
+                            // Attach local downloads for face comparison only when counts match,
+                            // which gives us confidence the order is the same.
+                            if (domItems.length === storyItems.length) {
+                                storyItems.forEach((s, idx) => {
+                                    if (domItems[idx]?.localPath) s.localPath = domItems[idx].localPath;
+                                });
+                            } else {
+                                console.log(`[STORIES] DOM captured ${domItems.length} stories but API returned ${storyItems.length} — skipping localPath association to avoid mismatches. Cleaning up temp files.`);
+                                for (const d of domItems) {
+                                    if (d.localPath) { try { fs.unlinkSync(d.localPath); } catch (_) {} }
+                                }
+                            }
+                        } else {
+                            console.log(`[STORIES] context.request returned status ${apiRes.status()}`);
+                        }
+                    } catch (e) {
+                        console.log("[STORIES] context.request failed:", e.message);
+                    }
+
+                    await browser.close();
+                    return storyItems;
+
+                }
+
+            } else {
+                console.log("Clicking profile picture did not open story viewer. Passing to API Fallbacks.");
+                await page.keyboard.press('Escape');
+                await sleep(1000);
+            }
+        } catch (e) {
+            console.log("Error in DOM click strategy:", e.message);
+        }
+
+        // API-only fallback (DOM click failed entirely): fetch story data directly
+        console.log("[STORIES] Fetching story metadata via context.request (DOM click failed)...");
+        try {
+            const cookies = await context.cookies();
+            const csrf = cookies.find(c => c.name === 'csrftoken')?.value || '';
+            const apiRes = await context.request.get(
+                `https://i.instagram.com/api/v1/feed/reels_media/?reel_ids=${userId}&source=profile`,
+                {
+                    headers: {
+                        'X-CSRFToken': csrf,
+                        'X-IG-App-ID': '936619743392459',
+                        'Referer': `https://www.instagram.com/${username}/`,
+                        'Origin': 'https://www.instagram.com'
+                    }
+                }
+            );
+            if (apiRes.ok()) {
+                const apiJson = await apiRes.json();
+                const items = apiJson.reels?.[userId]?.items || [];
+                console.log(`[STORIES] context.request returned ${items.length} story item(s).`);
+                items.forEach(item => {
+                    const isVideo = item.media_type === 2 || !!item.video_versions;
+                    storyItems.push({
+                        id: String(item.pk || item.id),
+                        url: isVideo ? (item.video_versions?.[0]?.url) : (item.image_versions2?.candidates?.[0]?.url),
+                        type: isVideo ? 'video' : 'image',
+                        timestamp: item.taken_at ? new Date(item.taken_at * 1000).toISOString() : new Date().toISOString(),
+                        thumbnail: item.image_versions2?.candidates?.[0]?.url,
+                        tags: extractTagsFromItem(item)
+                    });
+                });
+            } else {
+                console.log(`[STORIES] context.request returned status ${apiRes.status()}`);
+            }
+        } catch (e) {
+            console.log("[STORIES] context.request failed:", e.message);
+        }
+
+    } catch (e) {
+        console.error("Story fetch error:", e);
+    } finally {
+        await browser.close();
+    }
+    return storyItems;
+}
+
+async function checkProfileAccess(username) {
+    console.log(`Checking profile access for: ${username}`);
+    const { browser, context } = await getBrowserContext();
+    const page = await context.newPage();
+
+    try {
+        await page.goto(`https://www.instagram.com/${username}/`);
+        await page.waitForLoadState('domcontentloaded');
+        await sleep(2000, 4000);
+
+        // Check if we hit a login wall
+        if (page.url().includes('login')) {
+            console.log("Redirected to login. Cannot check access.");
+            return { accessible: false, reason: "Login required" };
+        }
+
+        // Check for "This account is private" text
+        const isPrivate = await page.evaluate(() => {
+            // Instagram uses various tags for this text depending on the react build
+            const h2s = Array.from(document.querySelectorAll('h2, span, div'));
+            return h2s.some(el => el.textContent && el.textContent.includes('This account is private'));
+        });
+
+        if (isPrivate) {
+            return { accessible: false, reason: "Account is private and not followed" };
+        }
+
+        // Check if account doesn't exist
+        const notFound = await page.evaluate(() => {
+            const els = Array.from(document.querySelectorAll('span, h2'));
+            return els.some(el => el.textContent && el.textContent.includes("Sorry, this page isn't available"));
+        });
+
+        if (notFound) {
+            return { accessible: false, reason: "Account not found or deleted" };
+        }
+
+        return { accessible: true };
+    } catch (e) {
+        console.error("Profile access check error:", e);
+        return { accessible: false, reason: "Error navigating to profile" };
+    } finally {
+        await browser.close();
+    }
+}
+
+/**
+ * Downloads a story image URL to a local temp file using Playwright's authenticated context.
+ * This avoids CDN geo-restrictions that block direct Node.js https/fetch requests.
+ * Returns the local file path, or null on failure.
+ */
+async function downloadStoryImage(imageUrl, destPath) {
+    let browser;
+    try {
+        browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+        });
+        const context = await browser.newContext({
+            storageState: AUTH_FILE,
+            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        });
+
+        const response = await context.request.get(imageUrl, {
+            headers: {
+                'Referer': 'https://www.instagram.com/',
+                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+            },
+            timeout: 15000
+        });
+
+        if (!response.ok()) {
+            console.log(`[DOWNLOAD] Failed to fetch story image, status: ${response.status()}`);
+            return null;
+        }
+
+        const buffer = await response.body();
+        fs.writeFileSync(destPath, buffer);
+        console.log(`[DOWNLOAD] Saved story image to ${destPath}`);
+        return destPath;
+    } catch (e) {
+        console.error(`[DOWNLOAD] Error downloading story image:`, e.message);
+        return null;
+    } finally {
+        if (browser) await browser.close();
+    }
+}
+
+module.exports = { login, getPostMetadata, getHighlightMetadata, getUserStories, checkProfileAccess, downloadStoryImage };

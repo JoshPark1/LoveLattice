@@ -1,59 +1,136 @@
 const cron = require('node-cron');
-const { getTrackedItems } = require('./db');
-const { getPostMetadata, getHighlightMetadata } = require('./instagram');
+const path = require('path');
+const fs = require('fs');
+const { getAccounts, addStoryLog } = require('./db');
+const { getPostMetadata, getHighlightMetadata, getUserStories, downloadStoryImage } = require('./instagram');
 const { sendSMS } = require('./notifier');
+const { compareFaces } = require('./faceRecognition');
 
-// Helper to delay (random 0-30 mins)
 const randomDelay = (ms) => new Promise(resolve => setTimeout(resolve, Math.random() * ms));
 
-async function checkItem(item) {
-    console.log(`Checking item: ${item.note || item.url}`);
+async function checkAccount(account) {
+    console.log(`Checking account: ${account.username} (${account.note})`);
 
-    let currentData = [];
-    try {
-        if (item.url.includes('/p/') || item.url.includes('/reel/')) {
-            // It's a post (carousel or single)
-            currentData = await getPostMetadata(item.url);
-        } else if (item.url.includes('/s/') || item.url.includes('/stories/')) {
-            // Highlight story
-            currentData = await getHighlightMetadata(item.url);
-        } else {
-            console.error(`[WARN] Unknown URL format: ${item.url}`);
-            return;
+    // 1. Check Tracked Posts
+    for (const post of account.trackedPosts || []) {
+        try {
+            let currentData = [];
+            if (post.url.includes('/p/') || post.url.includes('/reel/')) {
+                currentData = await getPostMetadata(post.url);
+            } else if (post.url.includes('/s/') || post.url.includes('/stories/')) {
+                currentData = await getHighlightMetadata(post.url);
+            } else {
+                console.error(`[WARN] Unknown URL format: ${post.url}`);
+                continue;
+            }
+
+            const exists = currentData.find(media => media.id === post.targetMediaId);
+
+            if (!exists) {
+                console.log(`ALARM: Media ${post.targetMediaId} missing from ${post.url}`);
+                await sendSMS(`Alert for @${account.username} (${account.note}): Tracked post (${post.note}) is missing! URL: ${post.url}`);
+                // TODO: update post status to 'missing'
+            } else {
+                console.log(`Verified: Post media ${post.targetMediaId} is still there.`);
+            }
+        } catch (e) {
+            console.error(`Error checking post ${post.url}:`, e);
         }
+    }
 
-        // verification
-        const exists = currentData.find(media => media.id === item.targetMediaId);
+    // 2. Check Active Stories
+    if (account.storyConfig && account.storyConfig.enabled) {
+        try {
+            console.log(`Fetching active stories for ${account.username}`);
+            // Wait to scatter network requests
+            await randomDelay(5000);
 
-        if (!exists) {
-            console.log(`ALARM: Media ${item.targetMediaId} missing from ${item.url}`);
-            await sendSMS(`ALERT: The photo/video you are tracking from ${item.note || 'Instagram'} seems to be missing! URL: ${item.url}`);
-            // Update status in DB?
-            // TODO: update item status to 'missing'
-        } else {
-            console.log(`Verified: ${item.targetMediaId} is still there.`);
+            const stories = await getUserStories(account.username);
+
+            for (const story of stories) {
+                let matchedReason = null;
+
+                // Compare Tags/Mentions
+                // Normalize both sides: strip leading @ so "@thejuicymelon" matches "thejuicymelon"
+                const tagsToCheck = (account.storyConfig.targetTags || []).map(t => t.replace(/^@/, '').toLowerCase());
+                const storyTags = (story.tags || []).map(t => t.replace(/^@/, '').toLowerCase());
+                const matchedTags = storyTags.filter(t => tagsToCheck.includes(t));
+                if (matchedTags.length > 0) {
+                    matchedReason = `Tag matched: ${matchedTags.join(', ')}`;
+                }
+
+                // Compare Face if image provided and no reason found yet
+                let savedLocalPath = null;
+                if (!matchedReason && account.storyConfig.referenceFaceUrl && story.type === 'image') {
+                    // story.localPath is downloaded inside the IG browser session (CDN URLs are session-scoped)
+                    const localPath = story.localPath;
+                    if (localPath) {
+                        console.log(`Comparing face for story (local: ${localPath})`);
+                        // referenceFaceUrl is stored as just a filename — resolve to full path
+                        let refFacePath = account.storyConfig.referenceFaceUrl;
+                        if (refFacePath && !refFacePath.startsWith('http') && !path.isAbsolute(refFacePath)) {
+                            refFacePath = path.join(__dirname, 'uploads', refFacePath);
+                        }
+                        const result = await compareFaces(refFacePath, localPath).catch(e => ({ match: false, error: e.message }));
+                        console.log(`Face comparison result:`, JSON.stringify(result));
+                        if (result.match) {
+                            matchedReason = `Face match detected (dist: ${result.distance.toFixed(2)})`;
+                            // Move to thumbnails so the dashboard can show it permanently
+                            const keepPath = path.join(__dirname, 'public', 'thumbnails', `story_match_${Date.now()}.jpg`);
+                            try { fs.renameSync(localPath, keepPath); savedLocalPath = `/thumbnails/${path.basename(keepPath)}`; } catch (_) {}
+                        } else {
+                            // No match — delete the temp file
+                            try { fs.unlinkSync(localPath); } catch (_) {}
+                        }
+                    } else {
+                        console.log('[SCHEDULER] No local story image available for face check (download may have failed).');
+                    }
+                }
+
+                // If match found, log and alert
+                if (matchedReason) {
+                    console.log(`Story match for ${account.username}:`, matchedReason);
+
+                    // For tag matches the face block was skipped, but we still have a temp
+                    // download — move it to permanent thumbnails so the dashboard can show
+                    // it without hitting Instagram's CDN.
+                    if (story.localPath && !savedLocalPath) {
+                        const keepPath = path.join(__dirname, 'public', 'thumbnails', `story_match_${Date.now()}.jpg`);
+                        try { fs.renameSync(story.localPath, keepPath); savedLocalPath = `/thumbnails/${path.basename(keepPath)}`; } catch (_) {}
+                    }
+
+                    await addStoryLog({
+                        accountId: account.id,
+                        username: account.username,
+                        storyId: story.id,
+                        storyThumbnail: savedLocalPath || story.thumbnail || story.url,
+                        reason: matchedReason,
+                        timestamp: story.timestamp || new Date().toISOString()
+                    });
+
+                    await sendSMS(`Alert for @${account.username} (${account.note}): Detected target in latest story! Reason: ${matchedReason}. Check logs dashboard.`);
+                } else {
+                    // No match at all — clean up any temp download
+                    if (story.localPath) {
+                        try { fs.unlinkSync(story.localPath); } catch (_) {}
+                    }
+                }
+
+            }
+        } catch (e) {
+            console.error(`Error checking stories for ${account.username}:`, e);
         }
-
-    } catch (e) {
-        console.error(`Error checking item ${item.url}:`, e);
-        // Don't alert on error immediately, could be transient
     }
 }
 
 function startDailyCheck() {
-    // Schedule to run every day at 9:00 AM
-    // 0 9 * * *
     cron.schedule('0 9 * * *', async () => {
         console.log("Running daily check...");
-
-        // Random start delay to mask automation
-        console.log("Waiting for random delay...");
         await randomDelay(30 * 60 * 1000); // 0-30 mins
 
-        const items = await getTrackedItems();
-        for (const item of items) {
-            await checkItem(item);
-            // Random delay between items
+        const accounts = await getAccounts();
+        for (const account of accounts) {
+            await checkAccount(account);
             await randomDelay(60 * 1000); // 0-60s
         }
     });
@@ -61,10 +138,9 @@ function startDailyCheck() {
 
 async function runManualCheck() {
     console.log("Running manual check...");
-    const items = await getTrackedItems();
-    for (const item of items) {
-        await checkItem(item);
-        // Small delay between items to avoid spamming
+    const accounts = await getAccounts();
+    for (const account of accounts) {
+        await checkAccount(account);
         await randomDelay(2000);
     }
 }
