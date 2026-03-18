@@ -108,7 +108,10 @@ async function checkAccount(account) {
                         timestamp: story.timestamp || new Date().toISOString()
                     });
 
-                    await sendSMS(`Alert for @${account.username} (${account.note}): Detected target in latest story! Reason: ${matchedReason}. Check logs dashboard.`);
+                    // Only send SMS if the user wants text notifications
+                    if (account.storyConfig.notify !== false) {
+                        await sendSMS(`Alert for @${account.username} (${account.note}): Detected target in latest story! Reason: ${matchedReason}. Check logs dashboard.`);
+                    }
                 } else {
                     // No match at all — clean up any temp download
                     if (story.localPath) {
