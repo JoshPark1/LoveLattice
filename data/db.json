@@ -1,0 +1,38 @@
+{
+  "accounts": [
+    {
+      "id": "1773875194408",
+      "username": "pie_dolphin",
+      "note": "test profile",
+      "trackedPosts": [],
+      "storyConfig": {
+        "enabled": true,
+        "targetTags": [
+          "thejuicymelon"
+        ],
+        "referenceFaceUrl": "1773992486146-jason_target.JPG",
+        "notify": false
+      }
+    }
+  ],
+  "storyLogs": [
+    {
+      "id": "1773992988278",
+      "timestamp": "2026-03-20T07:41:17.000Z",
+      "accountId": "1773875194408",
+      "username": "pie_dolphin",
+      "storyId": "3856850908731055614",
+      "storyThumbnail": "/thumbnails/story_match_1773992988274.jpg",
+      "reason": "Face match detected (dist: 0.38)"
+    },
+    {
+      "id": "1773975396702",
+      "timestamp": "2026-03-20T02:13:14.000Z",
+      "accountId": "1773875194408",
+      "username": "pie_dolphin",
+      "storyId": "3856685793804915411",
+      "storyThumbnail": "/thumbnails/story_match_1773975396702.jpg",
+      "reason": "Tag matched: thejuicymelon"
+    }
+  ]
+}
