@@ -1,13 +1,12 @@
 {
-  "name": "vector-celestial",
+  "name": "lovelattice-workspace",
+  "private": true,
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+    "dev": "npm run dev -ws --if-present",
+    "install:all": "npm install"
+  }
 }
