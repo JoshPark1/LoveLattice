@@ -214,7 +214,10 @@ export default function AccountDetail({
                     <div className="w-10 h-5 bg-bg-secondary border border-border rounded-full peer-checked:bg-accent transition-colors peer-disabled:bg-bg-tertiary peer-disabled:border-bg-tertiary" />
                     <div className="absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5 peer-disabled:bg-text-tertiary" />
                   </div>
-                  <span className="text-sm font-medium text-text-secondary">Text Notifications via SMS</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-text-secondary">Text Notifications via SMS</span>
+                    <span className="text-[10px] text-text-tertiary opacity-70">Msg & data rates apply. Reply STOP to cancel.</span>
+                  </div>
                 </label>
               </div>
 

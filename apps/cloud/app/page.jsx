@@ -409,7 +409,7 @@ function Legal() {
               <li><strong>Phone Number for Alerts:</strong> Your phone number is transmitted securely to our backend solely to deliver SMS notifications via Twilio.</li>
             </ul>
             <h3 className="text-white text-xl font-bold font-headline mt-8">2. Data Sharing &amp; Security</h3>
-            <p><strong>We do not share, sell, rent, or disclose any personal data to third parties.</strong> The only external service contacted is Twilio&apos;s API to deliver SMS messages to the phone number you provided. Because your media and logs are stored locally, the security of your information depends on your Mac&apos;s security (e.g., FileVault).</p>
+            <p><strong>We do not share, sell, rent, or disclose any personal data to third parties.</strong> Specifically, mobile phone numbers collected for SMS notifications are not shared with third parties or affiliates for marketing or promotional purposes. The only external service contacted is Twilio&apos;s API to deliver the specific alerts you requested. Because your media and logs are stored locally, the security of your private information depends on your Mac&apos;s security (e.g., FileVault).</p>
             <h3 className="text-white text-xl font-bold font-headline mt-8">3. SMS Notifications</h3>
             <p>When an alert is triggered, a message is sent via our secure Twilio integration. Message and data rates may apply. SMS message frequency varies based on Instagram activity. You can opt out at any time by disabling notifications in the app, or replying STOP.</p>
             <h3 className="text-white text-xl font-bold font-headline mt-8">4. Contact</h3>
@@ -429,9 +429,9 @@ function Legal() {
             <p>LoveLattice uses Twilio&apos;s API to deliver SMS notifications. By enabling SMS alerts, you agree to the following:</p>
             <ul className="list-disc pl-5 space-y-2 mt-2">
               <li><strong>Message and data rates may apply.</strong></li>
-              <li><strong>Message frequency varies</strong> based on activity settings.</li>
-              <li>You may opt out by disabling the feature, or replying <strong>STOP</strong> to cancel. Reply <strong>HELP</strong> for assistance.</li>
-              <li>Wireless carriers are not liable for delayed or undelivered messages. Participating carriers include AT&amp;T, Verizon, T-Mobile, Sprint, etc.</li>
+              <li><strong>Message frequency varies</strong> based on the activity of tracked accounts.</li>
+              <li>You may opt out at any time by disabling the feature in the app, or replying <strong>STOP</strong> to any message to cancel. Reply <strong>HELP</strong> for assistance.</li>
+              <li>Wireless carriers are not liable for delayed or undelivered messages. Participating carriers include AT&amp;T, Verizon, T-Mobile, Sprint, Boost, Virgin Mobile, and others.</li>
             </ul>
             <h3 className="text-white text-xl font-bold font-headline mt-8">2. Acceptable Use &amp; Rate Limiting</h3>
             <p>You agree to use LoveLattice only for lawful purposes. You must not use the App to stalk, harass, or circumvent any technical limitations. You represent that any account you monitor is your own or you have obtained explicit consent. To prevent abuse and ensure SMS delivery reliability, we reserve the right to enforce rate limits on SMS alerts per user account.</p>
