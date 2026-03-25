@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { getDataDir } = require('./paths');
 
 /**
  * Downloads an image from a URL and saves it to a local path.
@@ -8,7 +9,7 @@ const https = require('https');
  */
 function downloadThumbnail(url, id) {
     return new Promise((resolve, reject) => {
-        const destPath = path.join(__dirname, '../../../data', 'thumbnails', `${id}.jpg`);
+        const destPath = path.join(getDataDir(), 'thumbnails', `${id}.jpg`);
         const file = fs.createWriteStream(destPath);
 
         const options = {
@@ -41,7 +42,7 @@ function downloadThumbnail(url, id) {
  * Deletes a downloaded thumbnail from the disk.
  */
 function deleteThumbnail(id) {
-    const thumbnailPath = path.join(__dirname, '../../../data', 'thumbnails', `${id}.jpg`);
+    const thumbnailPath = path.join(getDataDir(), 'thumbnails', `${id}.jpg`);
     if (fs.existsSync(thumbnailPath)) {
         try {
             fs.unlinkSync(thumbnailPath);

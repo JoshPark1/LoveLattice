@@ -1,16 +1,18 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import express from 'express';
 import cors from 'cors';
 import { createRequire } from 'module';
-import { autoUpdater } from 'electron-updater';
 
 const require = createRequire(import.meta.url);
+const { autoUpdater } = require('electron-updater');
 const { startDailyCheck, runManualCheck } = require('./scraper/scheduler.js');
 const { login, getPostMetadata, getHighlightMetadata, checkProfileAccess } = require('./scraper/instagram.js');
 const { getAccounts, addAccount, updateAccount, removeAccount, getStoryLogs, deleteStoryLog } = require('./scraper/db.js');
+const { getDataDir } = require('./scraper/paths.js');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +20,7 @@ const __dirname = path.dirname(__filename);
 function startStaticServer() {
   const server = express();
   server.use(cors());
-  const dataDir = path.join(__dirname, '../../data');
+  const dataDir = getDataDir();
   server.use('/thumbnails', express.static(path.join(dataDir, 'thumbnails')));
   server.use('/uploads', express.static(path.join(dataDir, 'uploads')));
   
@@ -88,6 +90,11 @@ autoUpdater.on('error', (err) => {
 // ----------------------------
 
 app.whenReady().then(() => {
+  // Ensure writable data directories exist on first launch
+  const dataDir = getDataDir();
+  fs.mkdirSync(path.join(dataDir, 'thumbnails'), { recursive: true });
+  fs.mkdirSync(path.join(dataDir, 'uploads'), { recursive: true });
+
   if (process.platform === 'darwin') {
     app.dock.setIcon(path.join(__dirname, 'public/mac-icon.png'));
   }
@@ -125,7 +132,7 @@ ipcMain.handle('uploadFaceImage', async (e, { id, fileName, buffer }) => {
   if (!account) throw new Error("Account not found");
 
   const safeFileName = Date.now() + '-' + fileName;
-  const dataDir = path.join(__dirname, '../../data');
+  const dataDir = getDataDir();
   const destPath = path.join(dataDir, 'uploads', safeFileName);
   fs.writeFileSync(destPath, Buffer.from(buffer));
 
@@ -144,7 +151,7 @@ ipcMain.handle('removeFaceImage', async (e, id) => {
   if (!account) throw new Error("Account not found");
 
   if (account.storyConfig && account.storyConfig.referenceFaceUrl) {
-    const dataDir = path.join(__dirname, '../../data');
+    const dataDir = getDataDir();
     const oldPath = path.join(dataDir, 'uploads', account.storyConfig.referenceFaceUrl);
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
   }
@@ -169,7 +176,7 @@ ipcMain.handle('scan', async () => {
 });
 
 ipcMain.handle('logout', async () => {
-  const statePath = path.join(__dirname, 'scraper', 'storageState.json');
+  const statePath = path.join(getDataDir(), 'storageState.json');
   if (fs.existsSync(statePath)) fs.unlinkSync(statePath);
   return { success: true };
 });

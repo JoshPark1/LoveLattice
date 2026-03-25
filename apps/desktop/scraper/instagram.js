@@ -3,8 +3,9 @@ const stealth = require('puppeteer-extra-plugin-stealth')();
 chromium.use(stealth);
 const path = require('path');
 const fs = require('fs');
+const { getDataDir } = require('./paths');
 
-const AUTH_FILE = path.join(__dirname, 'storageState.json');
+const AUTH_FILE = path.join(getDataDir(), 'storageState.json');
 
 // Helper: Random integer between min and max
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -754,7 +755,7 @@ async function getUserStories(username) {
         for (const item of storyItems) {
             if (item.type === 'image') {
                 try {
-                    const tempPath = require('path').join(__dirname, `_temp_story_${Date.now()}_${Math.floor(Math.random()*1000)}.jpg`);
+                    const tempPath = path.join(getDataDir(), `_temp_story_${Date.now()}_${Math.floor(Math.random()*1000)}.jpg`);
                     const response = await context.request.get(item.url, {
                         headers: { 'Referer': 'https://www.instagram.com/' },
                         timeout: 15000

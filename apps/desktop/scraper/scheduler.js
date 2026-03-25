@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
+const { getDataDir } = require('./paths');
 const { getAccounts, addStoryLog } = require('./db');
 const { getPostMetadata, getHighlightMetadata, getUserStories, downloadStoryImage } = require('./instagram');
 async function sendSMS(message) {
@@ -79,14 +80,14 @@ async function checkAccount(account) {
                         // referenceFaceUrl is stored as just a filename — resolve to full path
                         let refFacePath = account.storyConfig.referenceFaceUrl;
                         if (refFacePath && !refFacePath.startsWith('http') && !path.isAbsolute(refFacePath)) {
-                            refFacePath = path.join(__dirname, '../../../data', 'uploads', refFacePath);
+                            refFacePath = path.join(getDataDir(), 'uploads', refFacePath);
                         }
                         const result = await compareFaces(refFacePath, localPath).catch(e => ({ match: false, error: e.message }));
                         console.log(`Face comparison result:`, JSON.stringify(result));
                         if (result.match) {
                             matchedReason = `Face match detected (dist: ${result.distance.toFixed(2)})`;
                             // Move to thumbnails so the dashboard can show it permanently
-                            const keepPath = path.join(__dirname, '../../../data', 'thumbnails', `story_match_${Date.now()}.jpg`);
+                            const keepPath = path.join(getDataDir(), 'thumbnails', `story_match_${Date.now()}.jpg`);
                             try { fs.renameSync(localPath, keepPath); savedLocalPath = `/thumbnails/${path.basename(keepPath)}`; } catch (_) {}
                         } else {
                             // No match — delete the temp file
@@ -105,7 +106,7 @@ async function checkAccount(account) {
                     // download — move it to permanent thumbnails so the dashboard can show
                     // it without hitting Instagram's CDN.
                     if (story.localPath && !savedLocalPath) {
-                        const keepPath = path.join(__dirname, '../../../data', 'thumbnails', `story_match_${Date.now()}.jpg`);
+                        const keepPath = path.join(getDataDir(), 'thumbnails', `story_match_${Date.now()}.jpg`);
                         try { fs.renameSync(story.localPath, keepPath); savedLocalPath = `/thumbnails/${path.basename(keepPath)}`; } catch (_) {}
                     }
 
@@ -136,7 +137,7 @@ async function checkAccount(account) {
     }
 }
 
-const LAST_SCAN_FILE = path.join(__dirname, '../../../data', 'last_scan.json');
+const LAST_SCAN_FILE = path.join(getDataDir(), 'last_scan.json');
 const MISSED_SCAN_THRESHOLD_MS = 23 * 60 * 60 * 1000; // 23 hours
 
 function getLastScanTime() {

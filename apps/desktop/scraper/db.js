@@ -2,8 +2,9 @@ const { JSONFilePreset } = require('lowdb/node');
 const { deleteThumbnail, downloadThumbnail } = require('./utils');
 const fs = require('fs');
 const path = require('path');
+const { getDataDir } = require('./paths');
 
-const DB_PATH = path.join(__dirname, '../../../data', 'db.json');
+const DB_PATH = path.join(getDataDir(), 'db.json');
 const defaultData = { accounts: [], storyLogs: [] };
 
 let db;
@@ -108,7 +109,7 @@ async function updateAccount(id, updatedAccountData) {
             if (!newPostIds.includes(oldPost.id)) {
                 if (oldPost.thumbnailUrl && oldPost.thumbnailUrl.startsWith('/thumbnails/')) {
                     const filename = oldPost.thumbnailUrl.split('/').pop();
-                    const thumbPath = path.join(__dirname, '../../../data', 'thumbnails', filename);
+                    const thumbPath = path.join(getDataDir(), 'thumbnails', filename);
                     if (fs.existsSync(thumbPath)) {
                         fs.unlinkSync(thumbPath);
                         console.log(`[DEBUG] Deleted old post thumbnail: ${thumbPath}`);
@@ -144,7 +145,7 @@ async function removeAccount(id) {
         for (const post of account.trackedPosts || []) {
             if (post.thumbnailUrl && post.thumbnailUrl.startsWith('/thumbnails/')) {
                 const filename = post.thumbnailUrl.split('/').pop();
-                const thumbPath = path.join(__dirname, '../../../data', 'thumbnails', filename);
+                const thumbPath = path.join(getDataDir(), 'thumbnails', filename);
                 if (fs.existsSync(thumbPath)) {
                     fs.unlinkSync(thumbPath);
                     console.log(`[DEBUG] Deleted old account's thumbnail: ${thumbPath}`);
@@ -211,7 +212,7 @@ async function deleteStoryLog(id) {
     // Delete the locally downloaded thumbnail if it exists
     if (log.storyThumbnail && log.storyThumbnail.startsWith('/thumbnails/')) {
         const filename = log.storyThumbnail.split('/').pop();
-        const thumbPath = path.join(__dirname, '../../../data', 'thumbnails', filename);
+        const thumbPath = path.join(getDataDir(), 'thumbnails', filename);
         if (fs.existsSync(thumbPath)) {
             fs.unlinkSync(thumbPath);
             console.log(`[DB] Deleted story log thumbnail: ${thumbPath}`);

@@ -2,6 +2,8 @@
   "name": "desktop",
   "private": true,
   "version": "0.0.0",
+  "description": "LoveLattice Desktop App",
+  "author": "LoveLattice",
   "type": "module",
   "main": "main.js",
   "scripts": {
@@ -10,15 +12,47 @@
     "build": "vite build && electron-builder",
     "build:vite": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "electron-builder install-app-deps"
   },
   "build": {
     "appId": "com.lovelattice.app",
     "productName": "LoveLattice",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/playwright/**/*",
+      "node_modules/playwright-core/**/*",
+      "node_modules/playwright-extra/**/*",
+      "node_modules/puppeteer-extra-plugin-stealth/**/*",
+      "node_modules/canvas/**/*",
+      "node_modules/@vladmandic/**/*",
+      "node_modules/@tensorflow/**/*"
+    ],
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.cjs",
+      "scraper/**/*",
+      "public/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache/**/*",
+      "!data/**/*"
+    ],
     "mac": {
       "category": "public.app-category.utilities",
-      "icon": "public/mac-icon.png",
-      "target": "dmg"
+      "icon": "public/mac-icon.icns",
+      "signIgnore": [
+        "puppeteer-extra-plugin-stealth/evasions/chrome.app"
+      ],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
     },
     "publish": [
       {
@@ -29,9 +63,13 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.1",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
     "@vladmandic/face-api": "^1.7.15",
     "canvas": "^3.2.1",
+    "cors": "^2.8.6",
     "electron-updater": "^6.8.3",
+    "express": "^5.2.1",
     "lowdb": "^7.0.1",
     "node-cron": "^4.2.1",
     "playwright": "^1.58.2",
@@ -48,7 +86,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "electron": "^41.0.3",
+    "electron": "41.0.3",
     "electron-builder": "^26.8.1",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",

@@ -1,5 +1,5 @@
 const path = require('path');
-const faceapi = require('@vladmandic/face-api');
+const faceapi = require('@vladmandic/face-api/dist/face-api.node-wasm.js');
 const canvas = require('canvas');
 
 // Patch nodejs environment for face-api

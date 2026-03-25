@@ -282,7 +282,7 @@ function Setup() {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText('xattr -cr "/Applications/LoveLattice.app"');
+    navigator.clipboard.writeText('xattr -cr "/Applications/LoveLattice"');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -316,7 +316,7 @@ function Setup() {
                 <p className="text-on-surface-variant leading-relaxed">Since we are an independent tool not tied to the Mac App Store, you&apos;ll need to run this command in Terminal to bypass macOS Gatekeeper:</p>
               </div>
               <div className="bg-surface-container-lowest p-6 rounded-2xl border border-white/5 relative group">
-                <code className="text-primary font-mono text-sm sm:text-base break-all">xattr -cr &quot;/Applications/LoveLattice.app&quot;</code>
+                <code className="text-primary font-mono text-sm sm:text-base break-all">xattr -cr &quot;/Applications/LoveLattice&quot;</code>
                 <button onClick={handleCopy} title="Copy Code" className="absolute right-4 top-1/2 -translate-y-1/2 bg-surface-container-high hover:bg-white/10 p-2 rounded-lg transition-colors border border-white/10 text-white flex items-center gap-1 cursor-pointer">
                   <span className={`material-symbols-outlined text-sm ${copied ? 'text-green-400' : ''}`}>{copied ? 'check' : 'content_copy'}</span>
                   <span className={`text-xs font-bold uppercase pr-1 hidden sm:block ${copied ? 'text-green-400' : ''}`}>{copied ? 'Copied!' : 'Copy'}</span>
@@ -413,7 +413,7 @@ function Legal() {
             <h3 className="text-white text-xl font-bold font-headline mt-8">3. SMS Notifications</h3>
             <p>When an alert is triggered, a message is sent via our secure Twilio integration. Message and data rates may apply. SMS message frequency varies based on Instagram activity. You can opt out at any time by disabling notifications in the app, or replying STOP.</p>
             <h3 className="text-white text-xl font-bold font-headline mt-8">4. Contact</h3>
-            <p>For privacy-related questions, contact us at: <a href="mailto:support@lovelattice.app" className="text-primary hover:underline">support@lovelattice.app</a></p>
+            <p>For privacy-related questions, contact us at: <a href="mailto:support@lovelattice.org" className="text-primary hover:underline">support@lovelattice.org</a></p>
           </div>
         </div>
 
@@ -438,7 +438,7 @@ function Legal() {
             <h3 className="text-white text-xl font-bold font-headline mt-8">3. Disclaimers &amp; Limitation of Liability</h3>
             <p>THE APP IS PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND. IN NO EVENT SHALL LOVELATTICE BE LIABLE FOR ANY INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOSS OF PROFITS OR DATA.</p>
             <h3 className="text-white text-xl font-bold font-headline mt-8">4. Contact</h3>
-            <p>For questions about these Terms, contact us at <a href="mailto:support@lovelattice.app" className="text-primary hover:underline">support@lovelattice.app</a>.</p>
+            <p>For questions about these Terms, contact us at <a href="mailto:support@lovelattice.org" className="text-primary hover:underline">support@lovelattice.org</a>.</p>
           </div>
         </div>
       </div>
@@ -463,7 +463,7 @@ function Footer() {
       </div>
       <div className="max-w-7xl mx-auto mt-12 flex justify-center md:justify-end">
         <div className="flex gap-8 opacity-40 hover:opacity-100 transition-opacity">
-          <a href="mailto:support@lovelattice.app"><span className="material-symbols-outlined cursor-pointer hover:text-primary">mail</span></a>
+          <a href="mailto:support@lovelattice.org"><span className="material-symbols-outlined cursor-pointer hover:text-primary">mail</span></a>
           <a href="#setup"><span className="material-symbols-outlined cursor-pointer hover:text-primary">help</span></a>
         </div>
       </div>
