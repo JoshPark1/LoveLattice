@@ -379,7 +379,7 @@ function Pricing() {
             <li className="flex items-center gap-3 text-on-surface-variant"><span className="material-symbols-outlined text-primary">check_circle</span> Free minor updates included</li>
           </ul>
 
-          <a href="https://buy.stripe.com/test_7sY4gr66QfSlcIQcnd7ss00  " className="block w-full py-4 bg-primary hover:bg-[#ff4d5a] text-white font-bold text-lg rounded-xl transition-all shadow-xl shadow-primary/20 cursor-pointer">
+          <a href="https://buy.stripe.com/00w28jauVdOl9lv9Mv0Ny00  " className="block w-full py-4 bg-primary hover:bg-[#ff4d5a] text-white font-bold text-lg rounded-xl transition-all shadow-xl shadow-primary/20 cursor-pointer">
             Purchase & Download &rarr;
           </a>
         </div>
