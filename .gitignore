@@ -34,6 +34,16 @@ apps/server-legacy/uploads/*
 # Temp story downloads (should be cleaned up at runtime, but just in case)
 apps/server-legacy/_temp_story_*.jpg
 
+# Local data directory (db, thumbnails, uploads — keep folders via .gitkeep)
+data/db.json
+data/thumbnails/*
+!data/thumbnails/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+
+# Next.js build output
+.next/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
