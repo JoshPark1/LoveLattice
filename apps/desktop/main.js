@@ -13,9 +13,64 @@ const { startDailyCheck, runManualCheck } = require('./scraper/scheduler.js');
 const { login, getPostMetadata, getHighlightMetadata, checkProfileAccess } = require('./scraper/instagram.js');
 const { getAccounts, addAccount, updateAccount, removeAccount, getStoryLogs, deleteStoryLog } = require('./scraper/db.js');
 const { getDataDir } = require('./scraper/paths.js');
+const { setLicenseKey } = require('./scraper/appConfig.js');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+app.setName('LoveLattice');
+app.setPath('userData', path.join(app.getPath('appData'), 'LoveLattice'));
+
+function setupLogging() {
+  const logDir = path.join(app.getPath('userData'), 'logs');
+  const logFile = path.join(logDir, 'main.log');
+  fs.mkdirSync(logDir, { recursive: true });
+
+  const append = (level, args) => {
+    const line = `[${new Date().toISOString()}] [${level}] ${args.map(arg => {
+      if (arg instanceof Error) return `${arg.stack || arg.message}`;
+      if (typeof arg === 'string') return arg;
+      try {
+        return JSON.stringify(arg);
+      } catch {
+        return String(arg);
+      }
+    }).join(' ')}\n`;
+
+    try {
+      fs.appendFileSync(logFile, line);
+    } catch {
+      // Avoid recursive logging failures.
+    }
+  };
+
+  const originalLog = console.log.bind(console);
+  const originalError = console.error.bind(console);
+  const originalWarn = console.warn.bind(console);
+
+  console.log = (...args) => {
+    append('INFO', args);
+    originalLog(...args);
+  };
+  console.error = (...args) => {
+    append('ERROR', args);
+    originalError(...args);
+  };
+  console.warn = (...args) => {
+    append('WARN', args);
+    originalWarn(...args);
+  };
+
+  process.on('uncaughtException', (error) => {
+    append('UNCAUGHT_EXCEPTION', [error]);
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    append('UNHANDLED_REJECTION', [reason]);
+  });
+
+  console.log(`[Logger] Writing main-process logs to ${logFile}`);
+}
 
 function startStaticServer() {
   const server = express();
@@ -90,6 +145,8 @@ autoUpdater.on('error', (err) => {
 // ----------------------------
 
 app.whenReady().then(() => {
+  setupLogging();
+
   // Ensure writable data directories exist on first launch
   const dataDir = getDataDir();
   fs.mkdirSync(path.join(dataDir, 'thumbnails'), { recursive: true });
@@ -184,5 +241,10 @@ ipcMain.handle('logout', async () => {
 ipcMain.handle('openProfile', async (e, username) => {
   const { openProfile } = require('./scraper/instagram.js');
   await openProfile(username);
+  return { success: true };
+});
+
+ipcMain.handle('setLicenseKey', async (e, licenseKey) => {
+  setLicenseKey(licenseKey || null);
   return { success: true };
 });

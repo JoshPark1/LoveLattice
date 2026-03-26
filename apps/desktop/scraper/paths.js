@@ -5,6 +5,7 @@
  * Prod: ~/Library/Application Support/LoveLattice/data/
  */
 const path = require('path');
+const fs = require('fs');
 
 function getDataDir() {
   if (process.env.NODE_ENV === 'development') {
@@ -16,4 +17,17 @@ function getDataDir() {
   return path.join(app.getPath('userData'), 'data');
 }
 
-module.exports = { getDataDir };
+function getUploadsDir() {
+  return path.join(getDataDir(), 'uploads');
+}
+
+function resolveStoredUploadPath(fileName) {
+  if (!fileName) return null;
+  if (fileName.startsWith('http') || path.isAbsolute(fileName)) return fileName;
+
+  const currentPath = path.join(getUploadsDir(), fileName);
+  if (fs.existsSync(currentPath)) return currentPath;
+  return currentPath;
+}
+
+module.exports = { getDataDir, getUploadsDir, resolveStoredUploadPath };

@@ -13,10 +13,18 @@ export async function OPTIONS() {
 
 export async function POST(request) {
   try {
-    const { licenseKey, machineId } = await request.json();
+    const { licenseKey, machineId, phoneNumber } = await request.json();
 
     if (!licenseKey || !machineId) {
       return NextResponse.json({ error: 'License key and Machine ID are required.' }, { status: 400, headers: corsHeaders });
+    }
+
+    const normalizedPhoneNumber = typeof phoneNumber === 'string'
+      ? phoneNumber.trim().replace(/[^\d+]/g, '')
+      : null;
+
+    if (normalizedPhoneNumber && !/^\+?[1-9]\d{9,14}$/.test(normalizedPhoneNumber)) {
+      return NextResponse.json({ error: 'Please enter a valid phone number, including country code when needed.' }, { status: 400, headers: corsHeaders });
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -43,20 +51,43 @@ export async function POST(request) {
       // First time activation! Lock it to this machine
       const { error: updateError } = await supabase
         .from('licenses')
-        .update({ status: 'active', machine_id: machineId })
+        .update({
+          status: 'active',
+          machine_id: machineId,
+          ...(normalizedPhoneNumber ? { phone_number: normalizedPhoneNumber } : {})
+        })
         .eq('id', license.id);
 
       if (updateError) {
         return NextResponse.json({ error: 'Failed to bind license to machine.' }, { status: 500, headers: corsHeaders });
       }
 
-      return NextResponse.json({ success: true, message: 'License activated successfully!' }, { status: 200, headers: corsHeaders });
+      return NextResponse.json({
+        success: true,
+        message: 'License activated successfully!',
+        phoneNumber: normalizedPhoneNumber || null
+      }, { status: 200, headers: corsHeaders });
     }
 
     // If it's already active, verify it matches the SAME machine ID
     if (license.status === 'active') {
       if (license.machine_id === machineId) {
-        return NextResponse.json({ success: true, message: 'License verified.' }, { status: 200, headers: corsHeaders });
+        if (normalizedPhoneNumber && normalizedPhoneNumber !== license.phone_number) {
+          const { error: updateError } = await supabase
+            .from('licenses')
+            .update({ phone_number: normalizedPhoneNumber })
+            .eq('id', license.id);
+
+          if (updateError) {
+            return NextResponse.json({ error: 'Failed to update phone number.' }, { status: 500, headers: corsHeaders });
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: 'License verified.',
+          phoneNumber: normalizedPhoneNumber || license.phone_number || null
+        }, { status: 200, headers: corsHeaders });
       } else {
         return NextResponse.json({ error: 'License is already bound to another machine.' }, { status: 403, headers: corsHeaders });
       }

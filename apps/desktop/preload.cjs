@@ -4,7 +4,7 @@ contextBridge.exposeInMainWorld('electron', {
   invoke: (channel, data) => {
     const validChannels = [
       'getAccounts', 'addAccount', 'updateAccount', 'removeAccount', 'uploadFaceImage', 'removeFaceImage',
-      'getStoryLogs', 'deleteStoryLog', 'preview', 'login', 'scan', 'logout', 'openProfile'
+      'getStoryLogs', 'deleteStoryLog', 'preview', 'login', 'scan', 'logout', 'openProfile', 'setLicenseKey'
     ];
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, data);

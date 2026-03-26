@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-
-// Using the local dev server for testing, will need to be production URL when Vercel deployed
-const CLOUD_URL = 'http://localhost:3000'; 
+import { CLOUD_URL } from '../config';
 
 export default function LicenseScreen({ onUnlock }) {
   const [key, setKey] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState(localStorage.getItem('lovelattice_phone_number') || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -28,7 +27,7 @@ export default function LicenseScreen({ onUnlock }) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ licenseKey: key, machineId })
+        body: JSON.stringify({ licenseKey: key, machineId, phoneNumber })
       });
 
       const data = await res.json();
@@ -36,6 +35,9 @@ export default function LicenseScreen({ onUnlock }) {
       if (res.ok) {
         // Activation successful! Save the key to bypass this screen forever
         localStorage.setItem('lovelattice_license', key);
+        if (data.phoneNumber) {
+          localStorage.setItem('lovelattice_phone_number', data.phoneNumber);
+        }
         onUnlock(key);
       } else {
         setError(data.error || 'Failed to verify license.');
@@ -71,6 +73,17 @@ export default function LicenseScreen({ onUnlock }) {
               onChange={(e) => setKey(e.target.value)}
               disabled={loading}
               autoFocus
+            />
+          </div>
+
+          <div>
+            <input
+              type="tel"
+              placeholder="Phone Number for SMS (e.g. +15551234567)"
+              className="w-full bg-[#18181b] border border-white/10 rounded-xl px-5 py-4 text-white placeholder:text-white/20 focus:outline-none focus:border-accent transition-colors"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              disabled={loading}
             />
           </div>
 

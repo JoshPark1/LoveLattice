@@ -2,7 +2,7 @@ const { JSONFilePreset } = require('lowdb/node');
 const { deleteThumbnail, downloadThumbnail } = require('./utils');
 const fs = require('fs');
 const path = require('path');
-const { getDataDir } = require('./paths');
+const { getDataDir, getUploadsDir, resolveStoredUploadPath } = require('./paths');
 
 const DB_PATH = path.join(getDataDir(), 'db.json');
 const defaultData = { accounts: [], storyLogs: [] };
@@ -35,7 +35,8 @@ async function getDb() {
                     storyConfig: {
                         enabled: false,
                         targetTags: [],
-                        referenceFaceUrl: null
+                        referenceFaceUrl: null,
+                        notify: false
                     }
                 };
                 db.data.accounts.push(dummyAccount);
@@ -69,7 +70,8 @@ async function addAccount({ username, note }) {
         storyConfig: {
             enabled: false,
             targetTags: [],
-            referenceFaceUrl: null
+            referenceFaceUrl: null,
+            notify: false
         }
     };
     db.data.accounts.push(newAccount);
@@ -123,7 +125,7 @@ async function updateAccount(id, updatedAccountData) {
     if (existing.storyConfig && updatedAccountData.storyConfig && existing.storyConfig.referenceFaceUrl && existing.storyConfig.referenceFaceUrl !== updatedAccountData.storyConfig.referenceFaceUrl) {
         // Optional: Clean up old uploaded face file if it exists and changed
         try {
-            const oldPath = path.join(__dirname, 'uploads', existing.storyConfig.referenceFaceUrl);
+            const oldPath = resolveStoredUploadPath(existing.storyConfig.referenceFaceUrl);
             if (fs.existsSync(oldPath)) {
                 fs.unlinkSync(oldPath);
             }
@@ -155,7 +157,7 @@ async function removeAccount(id) {
         // Clean up face photo
         if (account.storyConfig && account.storyConfig.referenceFaceUrl) {
             try {
-                const oldPath = path.join(__dirname, 'uploads', account.storyConfig.referenceFaceUrl);
+                const oldPath = resolveStoredUploadPath(account.storyConfig.referenceFaceUrl);
                 if (fs.existsSync(oldPath)) {
                     fs.unlinkSync(oldPath);
                 }
