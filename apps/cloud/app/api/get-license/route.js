@@ -28,14 +28,10 @@ export async function POST(request) {
 
     let downloadUrl = null;
     try {
-      const { dmgName } = await getCurrentMacRelease(supabase);
-      const { data: signedUrlData } = await supabase
-        .storage
-        .from('releases')
-        .createSignedUrl(dmgName, 3600);
-      downloadUrl = signedUrlData ? signedUrlData.signedUrl : null;
+      const release = await getCurrentMacRelease();
+      downloadUrl = release.downloadUrl;
     } catch (storageError) {
-      console.error('[get-license] Failed to build download URL from latest release:', storageError.message);
+      console.error('[get-license] Failed to build download URL from latest GitHub release:', storageError.message);
     }
 
     return NextResponse.json({ 

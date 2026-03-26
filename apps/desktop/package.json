@@ -67,8 +67,9 @@
     },
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://aftycwoxeulwcakvlnst.supabase.co/storage/v1/object/public/releases/"
+        "provider": "github",
+        "owner": "JoshPark1",
+        "repo": "LoveLattice"
       }
     ]
   },

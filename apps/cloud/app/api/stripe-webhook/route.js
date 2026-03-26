@@ -70,20 +70,13 @@ export async function POST(req) {
         console.log(`Successfully securely saved License Key [${licenseKey}] to Supabase database!`);
       }
 
-      // 3. Generate a 7-day secure download link for the current Apple Silicon dmg
+      // 3. Generate a download link for the current Apple Silicon dmg
       let downloadUrl = `https://love-lattice-cloud.vercel.app/success?session_id=${stripeSessionId}`;
       try {
-        const { dmgName } = await getCurrentMacRelease(supabase);
-        const { data: signedUrlData } = await supabase
-          .storage
-          .from('releases')
-          .createSignedUrl(dmgName, 3600 * 24 * 7);
-
-        if (signedUrlData?.signedUrl) {
-          downloadUrl = signedUrlData.signedUrl;
-        }
+        const release = await getCurrentMacRelease();
+        downloadUrl = release.downloadUrl;
       } catch (storageError) {
-        console.error('Failed to build signed release download URL:', storageError.message);
+        console.error('Failed to build GitHub release download URL:', storageError.message);
       }
 
       // 4. Send the beautiful receipt email
@@ -108,7 +101,7 @@ export async function POST(req) {
                 <h3 style="margin-top: 40px; color: #1a1a1a;">Step 1: Download the App</h3>
                 <p style="font-size: 16px; color: #71717a;">Download the incredibly lightweight desktop application for macOS (11.0+) on Apple Silicon.</p>
                 <a href="${downloadUrl}" style="display: inline-block; background-color: #ff4d5a; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px; margin-bottom: 25px;">Download LoveLattice for Mac (Apple Silicon)</a>
-                <p style="font-size: 13px; color: #a1a1aa; font-style: italic;">*For your security, this encrypted download link will expire in 7 days.</p>
+                <p style="font-size: 13px; color: #a1a1aa; font-style: italic;">*This download links to the latest public Apple Silicon release on GitHub.</p>
                 
                 <h3 style="margin-top: 30px; color: #1a1a1a;">Step 2: Hardware Activation</h3>
                 <p style="font-size: 16px; color: #71717a;">Drag the application into your Mac's <strong>Applications</strong> folder. When you open it for the first time, you will be prompted to paste your unique license key to permanently bind it to your computer.</p>

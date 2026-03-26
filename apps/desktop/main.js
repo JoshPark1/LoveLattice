@@ -118,12 +118,6 @@ function createWindow() {
   }
 }
 
-// --- Auto-updater setup ---
-autoUpdater.setFeedURL({
-  provider: 'generic',
-  url: 'https://aftycwoxeulwcakvlnst.supabase.co/storage/v1/object/public/releases/'
-});
-
 autoUpdater.on('update-available', () => {
   console.log('[Updater] New update available — downloading in background...');
 });
