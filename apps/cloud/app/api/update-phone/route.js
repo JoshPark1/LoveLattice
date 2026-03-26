@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { normalizePhoneNumber, getPhoneValidationMessage } from '../_lib/phone';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
-
-function normalizePhoneNumber(phoneNumber) {
-  return typeof phoneNumber === 'string'
-    ? phoneNumber.trim().replace(/[^\d+]/g, '')
-    : '';
-}
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
@@ -26,8 +21,8 @@ export async function POST(request) {
     }
 
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
-    if (!/^\+?[1-9]\d{9,14}$/.test(normalizedPhoneNumber)) {
-      return NextResponse.json({ error: 'Please enter a valid phone number, including country code when needed.' }, { status: 400, headers: corsHeaders });
+    if (!normalizedPhoneNumber) {
+      return NextResponse.json({ error: getPhoneValidationMessage() }, { status: 400, headers: corsHeaders });
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';

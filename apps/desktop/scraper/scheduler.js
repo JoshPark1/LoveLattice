@@ -6,7 +6,7 @@ const { getAccounts, addStoryLog } = require('./db');
 const { getLicenseKey } = require('./appConfig');
 const { getPostMetadata, getHighlightMetadata, getUserStories, downloadStoryImage } = require('./instagram');
 
-const CLOUD_URL = 'https://lovelattice.vercel.app';
+const CLOUD_URL = 'https://love-lattice-cloud.vercel.app';
 
 async function sendSMS(message) {
     const licenseKey = getLicenseKey();
