@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getCurrentMacRelease } from '../_lib/release';
 
 export async function POST(request) {
   try {
@@ -25,13 +26,17 @@ export async function POST(request) {
       return NextResponse.json({ error: `Not found: ${error?.message || 'No license'}` }, { status: 404 });
     }
 
-    // Generate a secure, 1-hour expiring download link for the .dmg file
-    const { data: signedUrlData, error: storageError } = await supabase
-      .storage
-      .from('releases')
-      .createSignedUrl('lovelattice-mac.dmg', 3600);
-      
-    const downloadUrl = signedUrlData ? signedUrlData.signedUrl : null;
+    let downloadUrl = null;
+    try {
+      const { dmgName } = await getCurrentMacRelease(supabase);
+      const { data: signedUrlData } = await supabase
+        .storage
+        .from('releases')
+        .createSignedUrl(dmgName, 3600);
+      downloadUrl = signedUrlData ? signedUrlData.signedUrl : null;
+    } catch (storageError) {
+      console.error('[get-license] Failed to build download URL from latest release:', storageError.message);
+    }
 
     return NextResponse.json({ 
       licenseKey: license.license_key,

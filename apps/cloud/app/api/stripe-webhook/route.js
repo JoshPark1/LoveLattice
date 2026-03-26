@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { getCurrentMacRelease } from '../_lib/release';
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -69,13 +70,21 @@ export async function POST(req) {
         console.log(`Successfully securely saved License Key [${licenseKey}] to Supabase database!`);
       }
 
-      // 3. Generate a 7-day secure download link for the email
-      const { data: signedUrlData } = await supabase
-        .storage
-        .from('releases')
-        .createSignedUrl('lovelattice-mac.dmg', 3600 * 24 * 7); 
-        
-      const downloadUrl = signedUrlData ? signedUrlData.signedUrl : 'https://lovelattice.vercel.app/success?session_id=' + stripeSessionId;
+      // 3. Generate a 7-day secure download link for the current Apple Silicon dmg
+      let downloadUrl = `https://love-lattice-cloud.vercel.app/success?session_id=${stripeSessionId}`;
+      try {
+        const { dmgName } = await getCurrentMacRelease(supabase);
+        const { data: signedUrlData } = await supabase
+          .storage
+          .from('releases')
+          .createSignedUrl(dmgName, 3600 * 24 * 7);
+
+        if (signedUrlData?.signedUrl) {
+          downloadUrl = signedUrlData.signedUrl;
+        }
+      } catch (storageError) {
+        console.error('Failed to build signed release download URL:', storageError.message);
+      }
 
       // 4. Send the beautiful receipt email
       if (customerEmail) {
@@ -97,15 +106,15 @@ export async function POST(req) {
                 </div>
                 
                 <h3 style="margin-top: 40px; color: #1a1a1a;">Step 1: Download the App</h3>
-                <p style="font-size: 16px; color: #71717a;">Download the incredibly lightweight desktop application for macOS (11.0+).</p>
-                <a href="${downloadUrl}" style="display: inline-block; background-color: #ff4d5a; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px; margin-bottom: 25px;">Download LoveLattice (.dmg)</a>
+                <p style="font-size: 16px; color: #71717a;">Download the incredibly lightweight desktop application for macOS (11.0+) on Apple Silicon.</p>
+                <a href="${downloadUrl}" style="display: inline-block; background-color: #ff4d5a; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px; margin-bottom: 25px;">Download LoveLattice for Mac (Apple Silicon)</a>
                 <p style="font-size: 13px; color: #a1a1aa; font-style: italic;">*For your security, this encrypted download link will expire in 7 days.</p>
                 
                 <h3 style="margin-top: 30px; color: #1a1a1a;">Step 2: Hardware Activation</h3>
                 <p style="font-size: 16px; color: #71717a;">Drag the application into your Mac's <strong>Applications</strong> folder. When you open it for the first time, you will be prompted to paste your unique license key to permanently bind it to your computer.</p>
                 
                 <h3 style="margin-top: 30px; color: #1a1a1a;">Step 3: First-Time Mac Setup</h3>
-                <p style="font-size: 16px; color: #71717a;">Because LoveLattice is an independent app, macOS requires a one-time terminal command to bypass Gatekeeper. Please follow the 30-second setup instructions here: <a href="https://lovelattice.vercel.app/#setup" style="color: #ff4d5a; font-weight: bold;">View Setup Guide</a></p>
+                <p style="font-size: 16px; color: #71717a;">Because LoveLattice is an independent app, macOS requires a one-time terminal command to bypass Gatekeeper. Please follow the 30-second setup instructions here: <a href="https://love-lattice-cloud.vercel.app/#setup" style="color: #ff4d5a; font-weight: bold;">View Setup Guide</a></p>
 
                 <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 40px 0;" />
                 <p style="font-size: 14px; color: #a1a1aa; text-align: center;">If you experience any issues, please reply directly to this email.</p>
