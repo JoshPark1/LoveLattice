@@ -346,10 +346,9 @@ function App() {
 
   // --- Render ---
 
-  // TESTING: License gate disabled — re-enable for production
-  // if (!license) {
-  //   return <LicenseScreen onUnlock={(key) => setLicense(key)} />;
-  // }
+  if (!license) {
+    return <LicenseScreen onUnlock={(key) => setLicense(key)} />;
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">

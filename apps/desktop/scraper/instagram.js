@@ -54,8 +54,8 @@ async function interactWithUI(page) {
     }
 }
 
-async function getBrowserContext() {
-    const browser = await chromium.launch({ headless: false });
+async function getBrowserContext({ headless = true } = {}) {
+    const browser = await chromium.launch({ headless });
     const context = await browser.newContext({
         storageState: fs.existsSync(AUTH_FILE) ? AUTH_FILE : undefined,
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -67,7 +67,7 @@ async function getBrowserContext() {
 }
 
 async function login({ headless = false } = {}) {
-    const { browser, context } = await getBrowserContext();
+    const { browser, context } = await getBrowserContext({ headless });
     const page = await context.newPage();
 
     try {
@@ -872,7 +872,7 @@ async function downloadStoryImage(imageUrl, destPath) {
 }
 
 async function openProfile(username) {
-    const { browser, context } = await getBrowserContext();
+    const { browser, context } = await getBrowserContext({ headless: false });
     const page = await context.newPage();
     await page.goto(`https://www.instagram.com/${username}/`);
     
