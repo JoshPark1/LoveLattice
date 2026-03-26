@@ -8,11 +8,41 @@ export default function SettingsModal({
   onLogin,
   onLogout,
   onSwitchComputers,
-  scanning
+  scanning,
+  phoneNumber,
+  onPhoneNumberChange,
+  onSavePhoneNumber,
+  savingPhoneNumber,
+  phoneNumberStatus,
 }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Settings">
       <div className="space-y-4">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-text-secondary">
+            SMS Phone Number
+          </label>
+          <input
+            type="tel"
+            className="input-field"
+            placeholder="+15551234567"
+            value={phoneNumber}
+            onChange={(e) => onPhoneNumberChange(e.target.value)}
+          />
+          <button
+            className="w-full btn-secondary py-3"
+            onClick={onSavePhoneNumber}
+            disabled={savingPhoneNumber}
+          >
+            {savingPhoneNumber ? 'Saving Phone Number...' : 'Save Phone Number'}
+          </button>
+          {phoneNumberStatus ? (
+            <p className="text-xs text-text-tertiary">{phoneNumberStatus}</p>
+          ) : null}
+        </div>
+
+        <hr className="border-border my-4" />
+
         <button
           className="w-full btn-secondary flex justify-center items-center py-3"
           onClick={onScan}
@@ -34,8 +64,6 @@ export default function SettingsModal({
         >
           Open Instagram Login
         </button>
-
-        <hr className="border-border my-4" />
 
         <button 
           className="w-full btn-secondary text-accent border-accent/20 hover:bg-accent hover:border-accent hover:text-white py-3 transition-colors" 

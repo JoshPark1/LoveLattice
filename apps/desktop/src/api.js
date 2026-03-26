@@ -20,3 +20,4 @@ export const triggerLogin = async () => window.electron.invoke('login');
 export const triggerScan = async () => window.electron.invoke('scan');
 export const triggerLogout = async () => window.electron.invoke('logout');
 export const openProfileSession = async (username) => window.electron.invoke('openProfile', username);
+export const syncLicenseKey = async (licenseKey) => window.electron.invoke('setLicenseKey', licenseKey);

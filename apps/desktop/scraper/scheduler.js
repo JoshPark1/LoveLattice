@@ -1,16 +1,31 @@
 const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
-const { getDataDir } = require('./paths');
+const { getDataDir, resolveStoredUploadPath } = require('./paths');
 const { getAccounts, addStoryLog } = require('./db');
+const { getLicenseKey } = require('./appConfig');
 const { getPostMetadata, getHighlightMetadata, getUserStories, downloadStoryImage } = require('./instagram');
+
+const CLOUD_URL = 'https://lovelattice.vercel.app';
+
 async function sendSMS(message) {
+    const licenseKey = getLicenseKey();
+    if (!licenseKey) {
+        console.warn('[SMS] Skipping SMS send because no license key is available in the desktop app config.');
+        return;
+    }
+
     try {
-        await fetch('http://localhost:3001/api/send-sms', {
+        const response = await fetch(`${CLOUD_URL}/api/send-sms`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
+            body: JSON.stringify({ message, licenseKey })
         });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
     } catch(e) {
         console.error("[SMS ERROR] Could not reach backend server:", e);
     }
@@ -78,10 +93,8 @@ async function checkAccount(account) {
                     if (localPath) {
                         console.log(`Comparing face for story (local: ${localPath})`);
                         // referenceFaceUrl is stored as just a filename — resolve to full path
-                        let refFacePath = account.storyConfig.referenceFaceUrl;
-                        if (refFacePath && !refFacePath.startsWith('http') && !path.isAbsolute(refFacePath)) {
-                            refFacePath = path.join(getDataDir(), 'uploads', refFacePath);
-                        }
+                        const refFacePath = resolveStoredUploadPath(account.storyConfig.referenceFaceUrl);
+                        console.log(`[SCHEDULER] Using reference face path: ${refFacePath}`);
                         const result = await compareFaces(refFacePath, localPath).catch(e => ({ match: false, error: e.message }));
                         console.log(`Face comparison result:`, JSON.stringify(result));
                         if (result.match) {
@@ -120,7 +133,7 @@ async function checkAccount(account) {
                     });
 
                     // Only send SMS if the user wants text notifications
-                    if (account.storyConfig.notify !== false) {
+                    if (account.storyConfig.notify === true) {
                         await sendSMS(`Alert for @${account.username} (${account.note}): Detected target in latest story! Reason: ${matchedReason}. Check logs dashboard.`);
                     }
                 } else {

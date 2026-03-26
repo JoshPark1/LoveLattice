@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   fetchAccounts, addAccount, updateAccount, removeAccount, uploadFaceImage, removeFaceImage,
-  fetchStoryLogs, deleteStoryLog, fetchPreview, triggerLogin, triggerScan, triggerLogout, API_BASE, SERVER_BASE
+  fetchStoryLogs, deleteStoryLog, fetchPreview, triggerLogin, triggerScan, triggerLogout, API_BASE, SERVER_BASE, syncLicenseKey
 } from './api';
 
 import Header from './components/Header';
@@ -14,6 +14,7 @@ import Modal from './components/Modal';
 import ConfirmModal from './components/ConfirmModal';
 import LicenseScreen from './components/LicenseScreen';
 import SettingsModal from './components/SettingsModal';
+import { CLOUD_URL } from './config';
 
 function App() {
   const [accounts, setAccounts] = useState([]);
@@ -21,6 +22,9 @@ function App() {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [license, setLicense] = useState(localStorage.getItem('lovelattice_license') || null);
+  const [phoneNumber, setPhoneNumber] = useState(localStorage.getItem('lovelattice_phone_number') || '');
+  const [savingPhoneNumber, setSavingPhoneNumber] = useState(false);
+  const [phoneNumberStatus, setPhoneNumberStatus] = useState('');
 
   // Modals state
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
@@ -65,9 +69,17 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- Handlers ---
+  useEffect(() => {
+    syncLicenseKey(license).catch((error) => {
+      console.error('Failed to sync license key to desktop process:', error);
+    });
+  }, [license]);
 
-  const CLOUD_URL = 'http://localhost:3000';
+  useEffect(() => {
+    setPhoneNumber(localStorage.getItem('lovelattice_phone_number') || '');
+  }, [license]);
+
+  // --- Handlers ---
 
   const handleSwitchComputers = () => {
     setConfirmModal({
@@ -91,8 +103,11 @@ function App() {
         }
         localStorage.removeItem('lovelattice_license');
         localStorage.removeItem('lovelattice_machine_id');
+        localStorage.removeItem('lovelattice_phone_number');
         setIsSettingsModalOpen(false);
         setLicense(null);
+        setPhoneNumber('');
+        setPhoneNumberStatus('');
       }
     });
   };
@@ -124,6 +139,40 @@ function App() {
       alert("Failed to start scan: " + e.message);
     } finally {
       setScanning(false);
+    }
+  };
+
+  const handleSavePhoneNumber = async () => {
+    const licenseKey = localStorage.getItem('lovelattice_license');
+    const machineId = localStorage.getItem('lovelattice_machine_id');
+
+    if (!licenseKey || !machineId) {
+      setPhoneNumberStatus('Activate your license on this machine before saving a phone number.');
+      return;
+    }
+
+    setSavingPhoneNumber(true);
+    setPhoneNumberStatus('');
+
+    try {
+      const res = await fetch(`${CLOUD_URL}/api/update-phone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseKey, machineId, phoneNumber })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save phone number.');
+      }
+
+      localStorage.setItem('lovelattice_phone_number', data.phoneNumber);
+      setPhoneNumber(data.phoneNumber);
+      setPhoneNumberStatus('Phone number saved for SMS alerts.');
+    } catch (error) {
+      setPhoneNumberStatus(error.message);
+    } finally {
+      setSavingPhoneNumber(false);
     }
   };
 
@@ -544,6 +593,11 @@ function App() {
         onLogout={handleLogout}
         onSwitchComputers={handleSwitchComputers}
         scanning={scanning}
+        phoneNumber={phoneNumber}
+        onPhoneNumberChange={setPhoneNumber}
+        onSavePhoneNumber={handleSavePhoneNumber}
+        savingPhoneNumber={savingPhoneNumber}
+        phoneNumberStatus={phoneNumberStatus}
       />
 
       {/* Confirm Modal */}

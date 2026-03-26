@@ -1,20 +1,67 @@
 const path = require('path');
+const fs = require('fs');
+const tf = require('@tensorflow/tfjs');
+const { setWasmPaths } = require('@tensorflow/tfjs-backend-wasm');
+require('@tensorflow/tfjs-backend-cpu');
 const faceapi = require('@vladmandic/face-api/dist/face-api.node-wasm.js');
 const canvas = require('canvas');
+const { app } = require('electron');
 
 // Patch nodejs environment for face-api
 const { Canvas, Image, ImageData } = canvas;
 faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
 
 let modelsLoaded = false;
+let backendReady;
+
+function resolvePackagePath(packageName) {
+    const packageJsonPath = require.resolve(`${packageName}/package.json`);
+
+    if (!app.isPackaged) {
+        return path.dirname(packageJsonPath);
+    }
+
+    const unpackedPackageJsonPath = packageJsonPath.replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
+    if (unpackedPackageJsonPath !== packageJsonPath) {
+        return path.dirname(unpackedPackageJsonPath);
+    }
+
+    return path.dirname(packageJsonPath);
+}
 
 async function loadModels() {
     if (modelsLoaded) return;
-    const modelPath = path.join(path.dirname(require.resolve('@vladmandic/face-api/package.json')), 'model');
+    if (!backendReady) {
+        backendReady = initializeBackend();
+    }
+    await backendReady;
+    const modelPath = path.join(resolvePackagePath('@vladmandic/face-api'), 'model');
+    console.log(`[FACE-API] Loading models from ${modelPath}`);
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath);
     await faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath);
     await faceapi.nets.faceRecognitionNet.loadFromDisk(modelPath);
     modelsLoaded = true;
+}
+
+async function initializeBackend() {
+    const wasmDir = path.join(resolvePackagePath('@tensorflow/tfjs-backend-wasm'), 'dist');
+    console.log(`[FACE-API] Initializing TensorFlow backend from ${wasmDir}`);
+
+    try {
+        setWasmPaths({
+            'tfjs-backend-wasm.wasm': path.join(wasmDir, 'tfjs-backend-wasm.wasm'),
+            'tfjs-backend-wasm-simd.wasm': path.join(wasmDir, 'tfjs-backend-wasm-simd.wasm'),
+            'tfjs-backend-wasm-threaded-simd.wasm': path.join(wasmDir, 'tfjs-backend-wasm-threaded-simd.wasm')
+        });
+        await tf.setBackend('wasm');
+        await tf.ready();
+        console.log(`[FACE-API] TensorFlow backend ready: ${tf.getBackend()}`);
+    } catch (error) {
+        console.warn(`[FACE-API] WASM backend initialization failed: ${error.message}`);
+        await tf.setBackend('cpu');
+        await tf.ready();
+        console.log(`[FACE-API] Falling back to TensorFlow backend: ${tf.getBackend()}`);
+    }
 }
 
 async function fetchImageBuffer(url, retries = 3) {
@@ -44,6 +91,9 @@ async function getFaceDescriptors(imageSource, single = true) {
         const buffer = await fetchImageBuffer(imageSource);
         img = await canvas.loadImage(buffer);
     } else {
+        if (!fs.existsSync(imageSource)) {
+            throw new Error(`Image file not found: ${imageSource}`);
+        }
         img = await canvas.loadImage(imageSource);
     }
 

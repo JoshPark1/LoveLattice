@@ -22,7 +22,7 @@ export async function POST(request) {
     // 3. Verify License in Database
     const { data: license, error: dbError } = await supabase
       .from('licenses')
-      .select('id, status, sms_count')
+      .select('id, status, sms_count, phone_number')
       .eq('license_key', licenseKey)
       .single();
 
@@ -40,6 +40,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Lifetime SMS limit reached. App will continue tracking, but texts are disabled.' }, { status: 429 });
     }
 
+    if (!license.phone_number) {
+      return NextResponse.json({ error: 'No phone number is saved for this license yet.' }, { status: 400 });
+    }
+
     // 5. If valid, initialize Twilio and send text
     if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
       console.log("Twilio credentials missing. Logging message:", message);
@@ -51,7 +55,7 @@ export async function POST(request) {
     await client.messages.create({
       body: message,
       from: process.env.TWILIO_PHONE_NUMBER,
-      to: process.env.USER_PHONE_NUMBER
+      to: license.phone_number
     });
 
     // 6. Very important: Charge them 1 credit by updating the database!
