@@ -34,8 +34,9 @@ apps/server-legacy/uploads/*
 # Temp story downloads (should be cleaned up at runtime, but just in case)
 apps/server-legacy/_temp_story_*.jpg
 
-# Local data directory (db, thumbnails, uploads — keep folders via .gitkeep)
-data/db.json
+# Local data directory runtime files (db, config, scan state — keep folders via .gitkeep)
+data/*.json
+!data/.gitkeep
 data/thumbnails/*
 !data/thumbnails/.gitkeep
 data/uploads/*
