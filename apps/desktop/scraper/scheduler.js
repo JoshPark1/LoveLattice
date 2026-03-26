@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
 const { getDataDir, resolveStoredUploadPath } = require('./paths');
-const { getAccounts, addStoryLog } = require('./db');
+const { getAccounts, addStoryLog, updateAccount } = require('./db');
 const { getLicenseKey } = require('./appConfig');
 const { getPostMetadata, getHighlightMetadata, getUserStories, downloadStoryImage } = require('./instagram');
 
@@ -36,9 +36,11 @@ const randomDelay = (ms) => new Promise(resolve => setTimeout(resolve, Math.rand
 
 async function checkAccount(account) {
     console.log(`Checking account: ${account.username} (${account.note})`);
+    let trackedPostsChanged = false;
+    const trackedPosts = (account.trackedPosts || []).map(post => ({ ...post }));
 
     // 1. Check Tracked Posts
-    for (const post of account.trackedPosts || []) {
+    for (const post of trackedPosts) {
         try {
             let currentData = [];
             if (post.url.includes('/p/') || post.url.includes('/reel/')) {
@@ -54,14 +56,26 @@ async function checkAccount(account) {
 
             if (!exists) {
                 console.log(`ALARM: Media ${post.targetMediaId} missing from ${post.url}`);
-                await sendSMS(`Alert for @${account.username} (${account.note}): Tracked post (${post.note}) is missing! URL: ${post.url}`);
-                // TODO: update post status to 'missing'
+                if (post.status !== 'missing') {
+                    post.status = 'missing';
+                    trackedPostsChanged = true;
+                    await sendSMS(`Alert for @${account.username} (${account.note}): Tracked post (${post.note}) is missing! URL: ${post.url}`);
+                }
             } else {
                 console.log(`Verified: Post media ${post.targetMediaId} is still there.`);
+                if (post.status !== 'active') {
+                    post.status = 'active';
+                    trackedPostsChanged = true;
+                }
             }
         } catch (e) {
             console.error(`Error checking post ${post.url}:`, e);
         }
+    }
+
+    if (trackedPostsChanged) {
+        account.trackedPosts = trackedPosts;
+        await updateAccount(account.id, { trackedPosts });
     }
 
     // 2. Check Active Stories

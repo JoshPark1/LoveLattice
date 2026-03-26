@@ -12,7 +12,8 @@
   "scripts": {
     "dev": "concurrently -n \"VITE,ELECTRON\" -c \"blue,yellow\" -k \"vite\" \"wait-on http://127.0.0.1:5173 && npm run electron:dev\"",
     "electron:dev": "cross-env NODE_ENV=development electron .",
-    "build": "vite build && electron-builder",
+    "build": "vite build && electron-builder --mac dmg zip --arm64",
+    "build:all": "vite build && electron-builder",
     "build:vite": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
