@@ -121,11 +121,11 @@ function SuccessContent() {
           >
             <span className="flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-xl">download</span>
-              Download Initializer (.dmg)
+              Download for Mac (Apple Silicon)
             </span>
           </a>
           <p className="text-xs text-on-surface-variant/50 mt-4 uppercase tracking-widest font-mono">
-            Requires macOS 11.0 or later
+            Requires macOS 11.0 or later • Apple Silicon only
           </p>
           <div className="mt-8 pt-6 border-t border-white/5">
             <p className="text-sm text-on-surface-variant max-w-sm mx-auto">

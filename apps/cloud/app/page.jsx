@@ -20,7 +20,7 @@ function Hero() {
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
           <a href="#pricing" className="w-full sm:w-auto px-8 py-4 bg-primary hover:bg-[#ff4d5a] text-white font-bold text-lg rounded-xl transition-all hover:scale-105 active:scale-95 shadow-xl shadow-primary/20">
-            Download for Mac
+            Download for Mac (Apple Silicon)
           </a>
           <a href="#features" className="w-full sm:w-auto px-8 py-4 border border-outline hover:bg-white/5 text-white font-bold text-lg rounded-xl transition-all active:scale-95">
             See How It Works
@@ -28,7 +28,7 @@ function Hero() {
         </div>
         <div className="pt-6">
           <p className="text-on-surface-variant text-xs font-mono uppercase tracking-widest opacity-60">
-            macOS only (for now) • Runs locally on your machine • No cloud • No subscription data sharing
+            macOS only (for now) • Apple Silicon only in this release • Runs locally on your machine • No cloud • No subscription data sharing
           </p>
         </div>
       </div>
